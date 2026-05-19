@@ -53,21 +53,21 @@
         .incidence-high { background: #ffebee; color: #c62828; }
         .chart-title { font-size: 11px; font-weight: 800; color: #2c6693; margin-bottom: 8px; text-transform: uppercase; }
         .chart-large { flex: 1; min-height: 0; position: relative; }
-        .data-source-indicator { font-size: 11px; padding: 4px 10px; border-radius: 4px; margin-left: 10px; font-weight: 600; }
-        .data-source-indicator.excel { background: #e8f5e9; color: #2e7d32; }
-        .data-source-indicator.error { background: #ffebee; color: #c62828; }
+        .data-source-indicator { font-size: 11px; padding: 4px 10px; border-radius: 4px; margin-left: 10px; font-weight: 600; background: #e8f5e9; color: #2e7d32; }
         @media (max-width: 1400px) { .main-container { grid-template-columns: 1fr; } .sidebar-cards-grid { grid-template-columns: repeat(4, 1fr); } }
         @media (max-width: 768px) { .sidebar-cards-grid { grid-template-columns: repeat(2, 1fr); } }
+        .one-line-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; }
+        .main-title { font-size: 28px; font-weight: 900; white-space: nowrap; }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="header-content">
             <div class="header-title-section">
-                <h1 style="font-size: 28px; font-weight: 900;">
-                    NMCP Malaria Analytics Dashboard
-                    <span class="data-source-indicator" id="dataSourceIndicator">Loading...</span>
-                </h1>
+                <div class="one-line-title">
+                    <h1 class="main-title">NMCP Malaria Analytics Dashboard</h1>
+                    <span class="data-source-indicator" id="dataSourceIndicator"></span>
+                </div>
                 <div style="font-size: 14px; opacity: 0.9; margin-top: 5px;">Sierra Leone National Malaria Control Programme — Surveillance & Treatment Monitoring</div>
             </div>
             <div class="header-filters">
@@ -94,17 +94,17 @@
     <div id="loadingOverlay" style="position:fixed; inset:0; background:rgba(31,74,106,0.92); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; color:white;">
         <div style="font-size:48px; margin-bottom:16px;">📊</div>
         <div style="font-size:22px; font-weight:700; margin-bottom:8px;">Loading Malaria Data</div>
-        <div style="font-size:14px; opacity:0.8;" id="loadingMsg">Connecting to GitHub data source...</div>
+        <div style="font-size:14px; opacity:0.8;" id="loadingMsg">Connecting to data source...</div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
         // ============================================
-        // CONFIGURATION - YOUR EXACT GITHUB CSV URL
+        // CONFIGURATION - EXACT GITHUB CSV URL
         // ============================================
         const GITHUB_CSV_URL = 'https://raw.githubusercontent.com/mohamedsillahkanu/SBD-final-final-version2.3/main/nmdr.csv';
         // ============================================
-        // GLOBAL STATE - NO SAMPLE DATA
+        // GLOBAL STATE
         // ============================================
         let charts = {};
         let currentSelection = 'national';
@@ -170,8 +170,9 @@
                 csvDataRaw = parsedData;
                 processLoadedData(csvDataRaw, 'surveillance');
                 
-                document.getElementById('dataSourceIndicator').textContent = `✅ Live CSV — ${csvDataRaw.length} rows`;
-                document.getElementById('dataSourceIndicator').className = 'data-source-indicator excel';
+                // Single line title with row count (no emoji, no "Live CSV" text)
+                const rowCount = csvDataRaw.length;
+                document.getElementById('dataSourceIndicator').textContent = `CSV — ${rowCount} rows`;
                 document.getElementById('loadingOverlay').style.display = 'none';
                 document.getElementById('dashboardContent').style.display = 'block';
                 
@@ -199,8 +200,7 @@
                         <button onclick="location.reload()" style="margin-top:20px; background:#ffeb3b; color:#333; border:none; padding:10px 20px; border-radius:8px; font-weight:bold; cursor:pointer;">Retry</button>
                     </div>
                 `;
-                document.getElementById('dataSourceIndicator').textContent = '❌ CSV Load Failed';
-                document.getElementById('dataSourceIndicator').className = 'data-source-indicator error';
+                document.getElementById('dataSourceIndicator').textContent = 'Error';
             }
         }
 
@@ -441,7 +441,7 @@
             });
         }
 
-        function handleDataTypeChange() { currentDataType = document.getElementById('dataTypeSelect').value; activeCardFilter = null; renderCards(); updateDashboard(); }
+        function handleDataTypeChange() { currentDataType = document.getElementById('dataTypeSelect').value; activeCardFilter = null; renderCards(); updateDashboard(); renderMonthlyIncidence(); }
         function handleTimePeriodChange() { currentTimePeriod = document.getElementById('timePeriodSelect').value; updateDashboard(); renderMonthlyIncidence(); }
         function handleHeaderDistrictChange() { const d = document.getElementById('headerDistrictSelect').value; if(!d) selectNational(); else selectDistrict(d); }
         function handleHeaderChiefdomChange() { const c = document.getElementById('headerChiefdomSelect').value; if(!c){ const d=document.getElementById('headerDistrictSelect').value; if(d) selectDistrict(d); } else selectChiefdom(c); }
