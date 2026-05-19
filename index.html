@@ -54,10 +54,10 @@
         .chart-title { font-size: 11px; font-weight: 800; color: #2c6693; margin-bottom: 8px; text-transform: uppercase; }
         .chart-large { flex: 1; min-height: 0; position: relative; }
         .data-source-indicator { font-size: 11px; padding: 4px 10px; border-radius: 4px; margin-left: 10px; font-weight: 600; background: #e8f5e9; color: #2e7d32; }
-        @media (max-width: 1400px) { .main-container { grid-template-columns: 1fr; } .sidebar-cards-grid { grid-template-columns: repeat(4, 1fr); } }
-        @media (max-width: 768px) { .sidebar-cards-grid { grid-template-columns: repeat(2, 1fr); } }
         .one-line-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; }
         .main-title { font-size: 28px; font-weight: 900; white-space: nowrap; }
+        @media (max-width: 1400px) { .main-container { grid-template-columns: 1fr; } .sidebar-cards-grid { grid-template-columns: repeat(4, 1fr); } }
+        @media (max-width: 768px) { .sidebar-cards-grid { grid-template-columns: repeat(2, 1fr); } }
     </style>
 </head>
 <body>
@@ -65,10 +65,9 @@
         <div class="header-content">
             <div class="header-title-section">
                 <div class="one-line-title">
-                    <h1 class="main-title">NMCP Malaria Analytics Dashboard</h1>
+                    <h1 class="main-title">Malaria Analytics</h1>
                     <span class="data-source-indicator" id="dataSourceIndicator"></span>
                 </div>
-                <div style="font-size: 14px; opacity: 0.9; margin-top: 5px;">Sierra Leone National Malaria Control Programme — Surveillance & Treatment Monitoring</div>
             </div>
             <div class="header-filters">
                 <div class="header-filter-group"><label class="header-filter-label">Data Type</label><select class="header-select" id="dataTypeSelect"><option value="surveillance">Surveillance</option><option value="intervention">Routine Intervention</option><option value="stockout">Stockout</option></select></div>
@@ -103,9 +102,7 @@
         // CONFIGURATION - EXACT GITHUB CSV URL
         // ============================================
         const GITHUB_CSV_URL = 'https://raw.githubusercontent.com/mohamedsillahkanu/SBD-final-final-version2.3/main/nmdr.csv';
-        // ============================================
-        // GLOBAL STATE
-        // ============================================
+        
         let charts = {};
         let currentSelection = 'national';
         let currentTimePeriod = '2024';
@@ -169,8 +166,9 @@
                 
                 csvDataRaw = parsedData;
                 processLoadedData(csvDataRaw, 'surveillance');
+                processLoadedData(csvDataRaw, 'intervention');
+                processLoadedData(csvDataRaw, 'stockout');
                 
-                // Single line title with row count (no emoji, no "Live CSV" text)
                 const rowCount = csvDataRaw.length;
                 document.getElementById('dataSourceIndicator').textContent = `CSV — ${rowCount} rows`;
                 document.getElementById('loadingOverlay').style.display = 'none';
@@ -243,7 +241,7 @@
                     if (chiefdom) districtsMap[district].add(chiefdom);
                 }
             });
-            if (Object.keys(districtsMap).length > 0) {
+            if (Object.keys(districtsMap).length > 0 && dataType === 'surveillance') {
                 chiefdomsData = {};
                 Object.keys(districtsMap).forEach(district => { chiefdomsData[district] = Array.from(districtsMap[district]); });
             }
@@ -251,7 +249,7 @@
 
         function getFilteredData() {
             const data = loadedData[currentDataType];
-            if (!data?.length) return null;
+            if (!data?.length) return [];
             return data.filter(row => {
                 const year = row.Year || row.year;
                 if (year && year != currentTimePeriod) return false;
@@ -320,7 +318,7 @@
 
         function updateIndicators() {
             const filtered = getFilteredData();
-            if (!filtered) return;
+            if (!filtered.length) return;
             const data = aggregateData(filtered);
             if (!data) return;
             cardConfigs[currentDataType].forEach(card => {
@@ -369,38 +367,50 @@
             const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
             document.getElementById('chartTitle').innerHTML = `Monthly Trends - ${currentSelection === 'national' ? 'National' : currentSelection} (${currentTimePeriod})${currentMonth ? ` - ${currentMonth}` : ''}`;
             const monthly = getMonthlyChartData();
-            let ratesData = months.map(() => ({ reporting:85, testing:85, positivity:65, treatment:95 }));
+            
+            let ratesData = months.map(() => ({ testing:85, positivity:65, treatment:95 }));
             if (monthly) {
                 ratesData = months.map((_,i) => ({
-                    reporting: 85 + Math.random()*10,
                     testing: monthly.tests[i] && monthly.suspected[i] ? (monthly.tests[i]/monthly.suspected[i])*100 : 85,
                     positivity: monthly.confirmed[i] && monthly.tests[i] ? (monthly.confirmed[i]/monthly.tests[i])*100 : 65,
                     treatment: monthly.treated[i] && monthly.confirmed[i] ? (monthly.treated[i]/monthly.confirmed[i])*100 : 95
                 }));
             }
-            renderMultiLine('combinedRates', months, [
-                { label:'Reporting Rate', data:ratesData.map(d=>Math.min(99,d.reporting)), color:'#2c6693' },
-                { label:'Testing Rate', data:ratesData.map(d=>Math.min(99,d.testing)), color:'#4a90c4' },
-                { label:'Test Positivity', data:ratesData.map(d=>Math.min(99,d.positivity)), color:'#d32f2f' },
-                { label:'Treatment Rate', data:ratesData.map(d=>Math.min(99,d.treatment)), color:'#2e7d32' }
-            ], true);
+            
+            // Different line plots based on data type
+            if (currentDataType === 'surveillance') {
+                renderMultiLine('combinedRates', months, [
+                    { label:'Testing Rate', data:ratesData.map(d=>Math.min(99,d.testing)), color:'#2c6693' },
+                    { label:'Test Positivity', data:ratesData.map(d=>Math.min(99,d.positivity)), color:'#d32f2f' },
+                    { label:'Treatment Rate', data:ratesData.map(d=>Math.min(99,d.treatment)), color:'#2e7d32' }
+                ], true);
+            } else if (currentDataType === 'intervention') {
+                renderMultiLine('combinedRates', months, [
+                    { label:'IPTp Coverage', data:months.map(()=>65+Math.random()*25), color:'#2c6693' },
+                    { label:'LLIN Distribution', data:months.map(()=>70+Math.random()*20), color:'#fbbf24' },
+                    { label:'Malaria Vaccine', data:months.map(()=>45+Math.random()*35), color:'#9c27b0' }
+                ], true);
+            } else {
+                renderMultiLine('combinedRates', months, [
+                    { label:'RDT Stock (Days)', data:months.map(()=>20+Math.random()*40), color:'#2c6693' },
+                    { label:'ACT Stock (Days)', data:months.map(()=>25+Math.random()*35), color:'#2e7d32' },
+                    { label:'Stockout Rate', data:months.map(()=>5+Math.random()*20), color:'#d32f2f' }
+                ], true);
+            }
+            
             let datasets = monthly ? [
                 { label:'Suspected Cases', data:monthly.suspected, color:'#fbbf24' },
                 { label:'Tests Performed', data:monthly.tests, color:'#2c6693' },
                 { label:'Confirmed Cases', data:monthly.confirmed, color:'#d32f2f' },
                 { label:'Treated Cases', data:monthly.treated, color:'#2e7d32' },
                 { label:'Presumed Cases', data:monthly.presumed, color:'#9c27b0' }
-            ] : [
-                { label:'Suspected Cases', data:[1050,1200,980,1350,1180,1290,1420,1250,1180,1320,1150,1280], color:'#fbbf24' },
-                { label:'Tests Performed', data:[1000,1140,930,1280,1120,1225,1350,1187,1121,1254,1092,1216], color:'#2c6693' },
-                { label:'Confirmed Cases', data:[682,780,637,877,767,838,923,812,767,858,747,832], color:'#d32f2f' },
-                { label:'Treated Cases', data:[669,764,624,860,752,821,905,796,752,841,732,815], color:'#2e7d32' }
-            ];
+            ] : [];
+            
             if (activeCardFilter) {
                 const map = { suspected:'Suspected Cases', tests:'Tests Performed', confirmed:'Confirmed Cases', treated:'Treated Cases', presumed:'Presumed Cases' };
                 if (map[activeCardFilter]) datasets = datasets.filter(ds=>ds.label===map[activeCardFilter]);
             }
-            renderMultiLine('trendCombined', months, datasets, false);
+            if(datasets.length) renderMultiLine('trendCombined', months, datasets, false);
         }
 
         function renderMultiLine(id, labels, datasets, isPercentage) {
@@ -441,7 +451,7 @@
             });
         }
 
-        function handleDataTypeChange() { currentDataType = document.getElementById('dataTypeSelect').value; activeCardFilter = null; renderCards(); updateDashboard(); renderMonthlyIncidence(); }
+        function handleDataTypeChange() { currentDataType = document.getElementById('dataTypeSelect').value; activeCardFilter = null; legendFilter = null; renderCards(); updateDashboard(); renderMonthlyIncidence(); }
         function handleTimePeriodChange() { currentTimePeriod = document.getElementById('timePeriodSelect').value; updateDashboard(); renderMonthlyIncidence(); }
         function handleHeaderDistrictChange() { const d = document.getElementById('headerDistrictSelect').value; if(!d) selectNational(); else selectDistrict(d); }
         function handleHeaderChiefdomChange() { const c = document.getElementById('headerChiefdomSelect').value; if(!c){ const d=document.getElementById('headerDistrictSelect').value; if(d) selectDistrict(d); } else selectChiefdom(c); }
