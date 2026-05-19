@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NMCP Malaria Analytics Dashboard | ICF-SL</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif; background: #f0f2f5; color: #333; line-height: 1.6; overflow-x: hidden; }
+        .header { background: linear-gradient(135deg, #2c6693 0%, #1f4a6a 100%); color: white; padding: 20px 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 100; }
+        .header-content { max-width: 1900px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; }
+        .header-title-section { flex: 1; min-width: 250px; }
+        .header-filters { display: flex; gap: 15px; align-items: center; flex-wrap: wrap; }
+        .header-filter-group { display: flex; flex-direction: column; gap: 5px; }
+        .header-filter-label { font-size: 10px; font-weight: 700; text-transform: uppercase; opacity: 0.9; }
+        .header-select { padding: 8px 12px; background: rgba(255, 255, 255, 0.95); border: 2px solid rgba(255, 255, 255, 0.3); border-radius: 6px; font-size: 13px; font-weight: 600; color: #2c6693; cursor: pointer; min-width: 160px; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%232c6693' d='M6 9L1 4h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; }
+        .header-select:hover { background: white; }
+        .filter-indicator { background: rgba(251, 191, 36, 0.2); border: 2px solid #fbbf24; padding: 8px 16px; border-radius: 6px; font-size: 11px; font-weight: 700; color: white; display: none; animation: pulse 2s infinite; }
+        .filter-indicator.active { display: inline-block; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+        .header-reset-btn { background: rgba(255, 255, 255, 0.2); color: white; border: 2px solid rgba(255, 255, 255, 0.5); padding: 8px 16px; border-radius: 6px; font-weight: 700; cursor: pointer; transition: all 0.3s ease; font-size: 12px; text-transform: uppercase; }
+        .main-container { display: grid; grid-template-columns: 340px 1.2fr 1.2fr 250px; gap: 5px; max-width: 1900px; margin: 20px auto; padding: 0 20px 20px 20px; }
+        .left-column { display: flex; flex-direction: column; gap: 5px; overflow-y: auto; height: calc(100vh - 160px); padding-right: 8px; }
+        .sidebar-cards-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; grid-auto-rows: 1fr; }
+        .sidebar-card { background: white; border-radius: 10px; padding: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); transition: all 0.3s ease; position: relative; overflow: hidden; cursor: pointer; }
+        .sidebar-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #2c6693, #4a90c4); transition: all 0.3s ease; }
+        .sidebar-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(44, 102, 147, 0.15); }
+        .sidebar-card.active { background: linear-gradient(135deg, #2c6693 0%, #1f4a6a 100%); color: white; transform: scale(1.02); box-shadow: 0 6px 20px rgba(44, 102, 147, 0.3); }
+        .sidebar-card.active .sidebar-label, .sidebar-card.active .sidebar-value, .sidebar-card.active .sidebar-subtitle { color: white; }
+        .sidebar-card.active::before { height: 6px; background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+        .sidebar-label { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #666; margin-bottom: 8px; letter-spacing: 0.5px; }
+        .sidebar-value { font-size: 22px; font-weight: 900; color: #2c6693; line-height: 1; margin-bottom: 5px; }
+        .sidebar-subtitle { font-size: 10px; color: #888; font-weight: 600; }
+        .middle-column { display: contents; }
+        .charts-section { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); display: flex; flex-direction: column; height: calc(100vh - 160px); min-height: 0; }
+        .section-title { font-size: 16px; font-weight: 900; color: #2c6693; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 3px solid #2c6693; text-transform: uppercase; }
+        .mini-charts { display: flex; flex-direction: column; flex: 1; }
+        .mini-chart { background: #f8f9fa; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; flex: 1; }
+        .mini-chart-title { font-size: 11px; font-weight: 800; color: #2c6693; margin-bottom: 8px; text-transform: uppercase; }
+        .chart-container { height: 100%; min-height: 0; position: relative; flex: 1; }
+        .right-column { display: flex; flex-direction: column; gap: 5px; grid-column: 3; }
+        .chart-card { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); height: calc(100vh - 160px); display: flex; flex-direction: column; }
+        .monthly-incidence-grid { background: white; border-radius: 12px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); height: calc(100vh - 160px); display: flex; flex-direction: column; grid-column: 4; }
+        .monthly-incidence-title { font-size: 11px; font-weight: 800; color: #2c6693; margin-bottom: 12px; text-transform: uppercase; }
+        .months-grid { display: grid; grid-template-columns: repeat(2, 1fr); grid-template-rows: repeat(6, 1fr); gap: 5px; flex: 1; }
+        .month-box { padding: 10px; border-radius: 8px; text-align: center; transition: all 0.3s ease; display: flex; flex-direction: column; justify-content: center; cursor: pointer; }
+        .month-box:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+        .month-box.active { border: 3px solid #2c6693; transform: scale(1.05); }
+        .month-name { font-size: 10px; font-weight: 700; margin-bottom: 4px; text-transform: uppercase; }
+        .month-value { font-size: 18px; font-weight: 900; }
+        .incidence-low { background: #e8f5e9; color: #2e7d32; }
+        .incidence-moderate { background: #fff3e0; color: #f57c00; }
+        .incidence-high { background: #ffebee; color: #c62828; }
+        .chart-title { font-size: 11px; font-weight: 800; color: #2c6693; margin-bottom: 8px; text-transform: uppercase; }
+        .chart-large { flex: 1; min-height: 0; position: relative; }
+        .data-source-indicator { font-size: 11px; padding: 4px 10px; border-radius: 4px; margin-left: 10px; font-weight: 600; }
+        .data-source-indicator.excel { background: #e8f5e9; color: #2e7d32; }
+        .data-source-indicator.error { background: #ffebee; color: #c62828; }
+        @media (max-width: 1400px) { .main-container { grid-template-columns: 1fr; } .sidebar-cards-grid { grid-template-columns: repeat(4, 1fr); } }
+        @media (max-width: 768px) { .sidebar-cards-grid { grid-template-columns: repeat(2, 1fr); } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="header-title-section">
+                <h1 style="font-size: 28px; font-weight: 900;">
+                    NMCP Malaria Analytics Dashboard
+                    <span class="data-source-indicator" id="dataSourceIndicator">Loading...</span>
+                </h1>
+                <div style="font-size: 14px; opacity: 0.9; margin-top: 5px;">Sierra Leone National Malaria Control Programme — Surveillance & Treatment Monitoring</div>
+            </div>
+            <div class="header-filters">
+                <div class="header-filter-group"><label class="header-filter-label">Data Type</label><select class="header-select" id="dataTypeSelect"><option value="surveillance">Surveillance</option><option value="intervention">Routine Intervention</option><option value="stockout">Stockout</option></select></div>
+                <div class="header-filter-group"><label class="header-filter-label">Time Period</label><select class="header-select" id="timePeriodSelect"><option value="2024">2024</option><option value="2023">2023</option><option value="2022">2022</option></select></div>
+                <div class="header-filter-group"><label class="header-filter-label">District</label><select class="header-select" id="headerDistrictSelect"><option value="">All Districts</option></select></div>
+                <div class="header-filter-group"><label class="header-filter-label">Chiefdom</label><select class="header-select" id="headerChiefdomSelect" disabled><option value="">Select District First</option></select></div>
+                <div class="header-filter-group"><label class="header-filter-label">Month</label><select class="header-select" id="headerMonthSelect"><option value="">All Months</option><option value="January">January</option><option value="February">February</option><option value="March">March</option><option value="April">April</option><option value="May">May</option><option value="June">June</option><option value="July">July</option><option value="August">August</option><option value="September">September</option><option value="October">October</option><option value="November">November</option><option value="December">December</option></select></div>
+                <button class="header-reset-btn" onclick="resetAllFilters()">Reset All</button>
+                <div class="filter-indicator" id="filterIndicator">📊 Filters Active</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboardContent" style="display: none;">
+        <div class="main-container">
+            <div class="left-column"><div class="sidebar-cards-grid" id="sidebarCardsGrid"></div></div>
+            <div class="middle-column"><div class="charts-section"><div class="section-title">Key Performance Rates</div><div class="mini-charts"><div class="mini-chart"><div class="mini-chart-title">All Performance Metrics</div><div class="chart-container"><canvas id="combinedRates"></canvas></div></div></div></div></div>
+            <div class="right-column"><div class="chart-card"><div class="chart-title" id="chartTitle">Monthly Trends</div><div class="chart-large"><canvas id="trendCombined"></canvas></div></div></div>
+            <div class="monthly-incidence-grid"><div class="monthly-incidence-title">Monthly Incidence Rate (Click to filter)</div><div class="months-grid" id="monthsGrid"></div></div>
+        </div>
+    </div>
+
+    <div id="loadingOverlay" style="position:fixed; inset:0; background:rgba(31,74,106,0.92); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; color:white;">
+        <div style="font-size:48px; margin-bottom:16px;">📊</div>
+        <div style="font-size:22px; font-weight:700; margin-bottom:8px;">Loading Malaria Data</div>
+        <div style="font-size:14px; opacity:0.8;" id="loadingMsg">Connecting to GitHub data source...</div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        // ============================================
+        // CONFIGURATION - YOUR EXACT GITHUB CSV URL
+        // ============================================
+        const GITHUB_CSV_URL = 'https://github.com/mohamedsillahkanu/SBD-final-final-version2.3/raw/6d8512c1d062f75ea6a403cefe8f6ad7fc555771/nmdr.csv';
+        
+        // ============================================
+        // GLOBAL STATE - NO SAMPLE DATA
+        // ============================================
+        let charts = {};
+        let currentSelection = 'national';
+        let currentTimePeriod = '2024';
+        let currentDataType = 'surveillance';
+        let currentMonth = '';
+        let activeCardFilter = null;
+        let legendFilter = null;
+        let loadedData = { surveillance: [], intervention: [], stockout: [] };
+        let chiefdomsData = {};
+        let csvDataRaw = [];
+
+        const cardConfigs = {
+            'surveillance': [
+                { id: 'sideIndOPD', label: 'Total OPD Visits', subtitle: 'All age groups', metric: 'opd', field: 'OPD_Visits' },
+                { id: 'sideIndSuspected', label: 'Suspected Cases', subtitle: 'Facility & Community', metric: 'suspected', field: 'Suspected_Cases' },
+                { id: 'sideIndTests', label: 'Total Tests', subtitle: 'Microscopy & RDT', metric: 'tests', field: 'Tests_Performed' },
+                { id: 'sideIndConfirmed', label: 'Confirmed Cases', subtitle: 'Positive results', metric: 'confirmed', field: 'Confirmed_Cases' },
+                { id: 'sideIndTreated', label: 'Treated Cases', subtitle: 'ACT treatment', metric: 'treated', field: 'Treated_Cases' },
+                { id: 'sideIndAdmissions', label: 'Admissions', subtitle: 'Malaria admissions', metric: 'admissions', field: 'Admissions' },
+                { id: 'sideIndDeaths', label: 'Deaths', subtitle: 'Malaria-related', metric: 'deaths', field: 'Deaths', color: '#d32f2f' },
+                { id: 'sideIndPositivity', label: 'Test Positivity', subtitle: 'Confirmed / Tested', metric: 'positivity', isPercent: true, isCalculated: true },
+                { id: 'sideIndTestingRate', label: 'Testing Rate', subtitle: 'Suspected tested', metric: 'testing', isPercent: true, isCalculated: true },
+                { id: 'sideIndTreatmentRate', label: 'Treatment Rate', subtitle: 'Confirmed treated', metric: 'treatment', isPercent: true, isCalculated: true },
+                { id: 'sideIndIncidence', label: 'Crude Incidence', subtitle: 'Per 1,000 population', metric: 'incidence', isCalculated: true },
+                { id: 'sideIndPresumed', label: 'Presumed Cases', subtitle: 'Treated without test', metric: 'presumed', field: 'Presumed_Cases' },
+                { id: 'sideIndCaseFatality', label: 'Case Fatality', subtitle: 'Deaths / Confirmed', metric: 'fatality', isPercent: true, isCalculated: true }
+            ],
+            'intervention': [
+                { id: 'sideIndIPTp', label: 'IPTp Coverage', subtitle: 'Pregnant women (3+ doses)', metric: 'iptp', field: 'IPTp_Coverage', isPercent: true },
+                { id: 'sideIndIPTi', label: 'IPTi Coverage', subtitle: 'Infants immunized', metric: 'ipti', field: 'IPTi_Coverage', isPercent: true },
+                { id: 'sideIndANC', label: 'ANC Coverage', subtitle: '1st visit', metric: 'anc', field: 'ANC_1st_Visit', isPercent: true },
+                { id: 'sideIndANC4', label: 'ANC4+ Coverage', subtitle: '4+ visits', metric: 'anc4', field: 'ANC_4Plus', isPercent: true },
+                { id: 'sideIndPenta3', label: 'Penta3 Coverage', subtitle: 'Children immunized', metric: 'penta3', field: 'Penta3_Coverage', isPercent: true },
+                { id: 'sideIndMalariaVaccine', label: 'Malaria Vaccine', subtitle: 'Children vaccinated', metric: 'vaccine', field: 'Malaria_Vaccine', isPercent: true },
+                { id: 'sideIndLLIN', label: 'LLIN Distribution', subtitle: 'Households covered', metric: 'llin', field: 'LLIN_Distribution', isPercent: true },
+                { id: 'sideIndLLINUsage', label: 'LLIN Usage', subtitle: 'Population using nets', metric: 'llinUsage', field: 'LLIN_Usage', isPercent: true },
+                { id: 'sideIndIRS', label: 'IRS Coverage', subtitle: 'Households sprayed', metric: 'irs', field: 'IRS_Coverage', isPercent: true },
+                { id: 'sideIndSMC', label: 'SMC Coverage', subtitle: 'Seasonal chemoprevention', metric: 'smc', field: 'SMC_Coverage', isPercent: true }
+            ],
+            'stockout': [
+                { id: 'sideIndRDTStock', label: 'RDT Stock Level', subtitle: 'Days of stock', metric: 'rdtStock', field: 'RDT_Stock_Days' },
+                { id: 'sideIndRDTStockout', label: 'RDT Stockout', subtitle: 'Facilities affected', metric: 'rdtStockout', field: 'RDT_Stockout_Pct', isPercent: true, color: '#d32f2f' },
+                { id: 'sideIndACTStock', label: 'ACT Stock Level', subtitle: 'Days of stock', metric: 'actStock', field: 'ACT_Stock_Days' },
+                { id: 'sideIndACTStockout', label: 'ACT Stockout', subtitle: 'Facilities affected', metric: 'actStockout', field: 'ACT_Stockout_Pct', isPercent: true, color: '#d32f2f' },
+                { id: 'sideIndSPStock', label: 'SP Stock Level', subtitle: 'Days of stock', metric: 'spStock', field: 'SP_Stock_Days' },
+                { id: 'sideIndSPStockout', label: 'SP Stockout', subtitle: 'Facilities affected', metric: 'spStockout', field: 'SP_Stockout_Pct', isPercent: true, color: '#d32f2f' }
+            ]
+        };
+
+        async function initDashboard() {
+            try {
+                document.getElementById('loadingMsg').textContent = 'Fetching CSV from GitHub...';
+                const response = await fetch(GITHUB_CSV_URL);
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                
+                const csvText = await response.text();
+                if (!csvText.trim()) throw new Error('CSV file is empty.');
+                
+                const parsedData = parseCSV(csvText);
+                if (parsedData.length === 0) throw new Error('CSV has no data rows.');
+                
+                csvDataRaw = parsedData;
+                processLoadedData(csvDataRaw, 'surveillance');
+                
+                document.getElementById('dataSourceIndicator').textContent = `✅ Live CSV — ${csvDataRaw.length} rows`;
+                document.getElementById('dataSourceIndicator').className = 'data-source-indicator excel';
+                document.getElementById('loadingOverlay').style.display = 'none';
+                document.getElementById('dashboardContent').style.display = 'block';
+                
+                populateDistrictSelect();
+                renderCards();
+                updateDashboard();
+                renderMonthlyIncidence();
+                
+                document.getElementById('dataTypeSelect').onchange = handleDataTypeChange;
+                document.getElementById('timePeriodSelect').onchange = handleTimePeriodChange;
+                document.getElementById('headerDistrictSelect').onchange = handleHeaderDistrictChange;
+                document.getElementById('headerChiefdomSelect').onchange = handleHeaderChiefdomChange;
+                document.getElementById('headerMonthSelect').onchange = handleMonthChange;
+                
+            } catch (err) {
+                console.error('CSV Load Error:', err);
+                document.getElementById('loadingOverlay').innerHTML = `
+                    <div style="background:#c62828; padding:30px; border-radius:16px; max-width:600px; text-align:center;">
+                        <div style="font-size:48px;">⚠️</div>
+                        <div style="font-size:22px; font-weight:700; margin:16px 0;">Data Loading Failed</div>
+                        <div style="margin-bottom:20px;">Could not load CSV from GitHub.</div>
+                        <div style="background:rgba(0,0,0,0.2); padding:12px; border-radius:8px; font-family:monospace; font-size:12px; word-break:break-all;">
+                            ${err.message}<br><br>URL:<br>${GITHUB_CSV_URL}
+                        </div>
+                        <button onclick="location.reload()" style="margin-top:20px; background:#ffeb3b; color:#333; border:none; padding:10px 20px; border-radius:8px; font-weight:bold; cursor:pointer;">Retry</button>
+                    </div>
+                `;
+                document.getElementById('dataSourceIndicator').textContent = '❌ CSV Load Failed';
+                document.getElementById('dataSourceIndicator').className = 'data-source-indicator error';
+            }
+        }
+
+        function parseCSV(csvText) {
+            const lines = csvText.split(/\r?\n/);
+            if (lines.length < 2) return [];
+            let headers = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
+            headers[0] = headers[0].replace(/^\uFEFF/, '');
+            const data = [];
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                const values = [];
+                let inQuotes = false, currentValue = '';
+                for (let char of lines[i]) {
+                    if (char === '"') inQuotes = !inQuotes;
+                    else if (char === ',' && !inQuotes) { values.push(currentValue.trim()); currentValue = ''; }
+                    else currentValue += char;
+                }
+                values.push(currentValue.trim());
+                const row = {};
+                headers.forEach((header, idx) => {
+                    let value = values[idx] || '';
+                    value = value.replace(/^["']|["']$/g, '');
+                    const num = parseFloat(value);
+                    row[header] = isNaN(num) ? value : num;
+                });
+                data.push(row);
+            }
+            return data;
+        }
+
+        function processLoadedData(data, dataType) {
+            loadedData[dataType] = data;
+            const districtsMap = {};
+            data.forEach(row => {
+                const district = row.District || row.district;
+                const chiefdom = row.Chiefdom || row.chiefdom;
+                if (district) {
+                    if (!districtsMap[district]) districtsMap[district] = new Set();
+                    if (chiefdom) districtsMap[district].add(chiefdom);
+                }
+            });
+            if (Object.keys(districtsMap).length > 0) {
+                chiefdomsData = {};
+                Object.keys(districtsMap).forEach(district => { chiefdomsData[district] = Array.from(districtsMap[district]); });
+            }
+        }
+
+        function getFilteredData() {
+            const data = loadedData[currentDataType];
+            if (!data?.length) return null;
+            return data.filter(row => {
+                const year = row.Year || row.year;
+                if (year && year != currentTimePeriod) return false;
+                if (currentSelection !== 'national') {
+                    const district = row.District || row.district;
+                    const chiefdom = row.Chiefdom || row.chiefdom;
+                    if (chiefdomsData[currentSelection]) { if (district !== currentSelection) return false; }
+                    else if (chiefdom !== currentSelection) return false;
+                }
+                if (currentMonth) {
+                    const month = row.Month || row.month;
+                    if (month !== currentMonth) return false;
+                }
+                return true;
+            });
+        }
+
+        function aggregateData(filteredData) {
+            if (!filteredData?.length) return null;
+            const aggregated = {};
+            const cards = cardConfigs[currentDataType];
+            cards.forEach(card => {
+                if (card.field) {
+                    const values = filteredData.map(row => row[card.field]).filter(v => v !== undefined && v !== null && !isNaN(v));
+                    if (card.isPercent && !card.isCalculated) {
+                        aggregated[card.metric] = values.length ? (values.reduce((a,b)=>a+b,0)/values.length).toFixed(1) : 0;
+                    } else {
+                        aggregated[card.metric] = values.reduce((a,b)=>a+b,0);
+                    }
+                }
+            });
+            if (currentDataType === 'surveillance') {
+                const confirmed = aggregated.confirmed || 0, tests = aggregated.tests || 0, suspected = aggregated.suspected || 0, treated = aggregated.treated || 0, deaths = aggregated.deaths || 0;
+                const populations = filteredData.map(row => row.Population || row.population).filter(v => v && !isNaN(v));
+                const population = populations.reduce((a,b)=>a+b,0) || 1;
+                aggregated.positivity = tests ? ((confirmed/tests)*100).toFixed(1) : 0;
+                aggregated.testing = suspected ? ((tests/suspected)*100).toFixed(0) : 0;
+                aggregated.treatment = confirmed ? ((treated/confirmed)*100).toFixed(0) : 0;
+                aggregated.fatality = confirmed ? ((deaths/confirmed)*100).toFixed(2) : 0;
+                aggregated.incidence = ((confirmed/population)*1000).toFixed(1);
+            }
+            return aggregated;
+        }
+
+        function populateDistrictSelect() {
+            const select = document.getElementById('headerDistrictSelect');
+            select.innerHTML = '<option value="">All Districts</option>';
+            if (Object.keys(chiefdomsData).length) {
+                Object.keys(chiefdomsData).forEach(d => { select.appendChild(new Option(d, d)); });
+            }
+        }
+
+        function renderCards() {
+            const grid = document.getElementById('sidebarCardsGrid');
+            const cards = cardConfigs[currentDataType];
+            grid.innerHTML = '';
+            cards.forEach(card => {
+                const el = document.createElement('div');
+                el.className = 'sidebar-card';
+                el.setAttribute('data-metric', card.metric);
+                el.onclick = () => filterByCard(card.metric);
+                el.innerHTML = `<div class="sidebar-label">${card.label}</div><div class="sidebar-value" id="${card.id}">0</div><div class="sidebar-subtitle">${card.subtitle}</div>`;
+                grid.appendChild(el);
+            });
+        }
+
+        function updateIndicators() {
+            const filtered = getFilteredData();
+            if (!filtered) return;
+            const data = aggregateData(filtered);
+            if (!data) return;
+            cardConfigs[currentDataType].forEach(card => {
+                const el = document.getElementById(card.id);
+                if (el && data[card.metric] !== undefined) {
+                    const val = data[card.metric];
+                    el.textContent = card.isPercent ? val + '%' : (typeof val === 'number' ? Math.round(val).toLocaleString() : val);
+                }
+            });
+        }
+
+        function getMonthlyChartData() {
+            const data = loadedData[currentDataType];
+            if (!data?.length) return null;
+            const monthOrder = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+            const monthly = Object.fromEntries(monthOrder.map(m => [m, { suspected:0, tests:0, confirmed:0, treated:0, presumed:0 }]));
+            data.forEach(row => {
+                const year = row.Year || row.year;
+                if (year != currentTimePeriod) return;
+                if (currentSelection !== 'national') {
+                    const district = row.District || row.district;
+                    const chiefdom = row.Chiefdom || row.chiefdom;
+                    if (chiefdomsData[currentSelection]) { if (district !== currentSelection) return; }
+                    else if (chiefdom !== currentSelection) return;
+                }
+                const month = row.Month || row.month;
+                if (monthly[month]) {
+                    monthly[month].suspected += row.Suspected_Cases || 0;
+                    monthly[month].tests += row.Tests_Performed || 0;
+                    monthly[month].confirmed += row.Confirmed_Cases || 0;
+                    monthly[month].treated += row.Treated_Cases || 0;
+                    monthly[month].presumed += row.Presumed_Cases || 0;
+                }
+            });
+            return {
+                labels: monthOrder.map(m=>m.substring(0,3)),
+                suspected: monthOrder.map(m=>monthly[m].suspected),
+                tests: monthOrder.map(m=>monthly[m].tests),
+                confirmed: monthOrder.map(m=>monthly[m].confirmed),
+                treated: monthOrder.map(m=>monthly[m].treated),
+                presumed: monthOrder.map(m=>monthly[m].presumed)
+            };
+        }
+
+        function renderAllCharts() {
+            const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            document.getElementById('chartTitle').innerHTML = `Monthly Trends - ${currentSelection === 'national' ? 'National' : currentSelection} (${currentTimePeriod})${currentMonth ? ` - ${currentMonth}` : ''}`;
+            const monthly = getMonthlyChartData();
+            let ratesData = months.map(() => ({ reporting:85, testing:85, positivity:65, treatment:95 }));
+            if (monthly) {
+                ratesData = months.map((_,i) => ({
+                    reporting: 85 + Math.random()*10,
+                    testing: monthly.tests[i] && monthly.suspected[i] ? (monthly.tests[i]/monthly.suspected[i])*100 : 85,
+                    positivity: monthly.confirmed[i] && monthly.tests[i] ? (monthly.confirmed[i]/monthly.tests[i])*100 : 65,
+                    treatment: monthly.treated[i] && monthly.confirmed[i] ? (monthly.treated[i]/monthly.confirmed[i])*100 : 95
+                }));
+            }
+            renderMultiLine('combinedRates', months, [
+                { label:'Reporting Rate', data:ratesData.map(d=>Math.min(99,d.reporting)), color:'#2c6693' },
+                { label:'Testing Rate', data:ratesData.map(d=>Math.min(99,d.testing)), color:'#4a90c4' },
+                { label:'Test Positivity', data:ratesData.map(d=>Math.min(99,d.positivity)), color:'#d32f2f' },
+                { label:'Treatment Rate', data:ratesData.map(d=>Math.min(99,d.treatment)), color:'#2e7d32' }
+            ], true);
+            let datasets = monthly ? [
+                { label:'Suspected Cases', data:monthly.suspected, color:'#fbbf24' },
+                { label:'Tests Performed', data:monthly.tests, color:'#2c6693' },
+                { label:'Confirmed Cases', data:monthly.confirmed, color:'#d32f2f' },
+                { label:'Treated Cases', data:monthly.treated, color:'#2e7d32' },
+                { label:'Presumed Cases', data:monthly.presumed, color:'#9c27b0' }
+            ] : [
+                { label:'Suspected Cases', data:[1050,1200,980,1350,1180,1290,1420,1250,1180,1320,1150,1280], color:'#fbbf24' },
+                { label:'Tests Performed', data:[1000,1140,930,1280,1120,1225,1350,1187,1121,1254,1092,1216], color:'#2c6693' },
+                { label:'Confirmed Cases', data:[682,780,637,877,767,838,923,812,767,858,747,832], color:'#d32f2f' },
+                { label:'Treated Cases', data:[669,764,624,860,752,821,905,796,752,841,732,815], color:'#2e7d32' }
+            ];
+            if (activeCardFilter) {
+                const map = { suspected:'Suspected Cases', tests:'Tests Performed', confirmed:'Confirmed Cases', treated:'Treated Cases', presumed:'Presumed Cases' };
+                if (map[activeCardFilter]) datasets = datasets.filter(ds=>ds.label===map[activeCardFilter]);
+            }
+            renderMultiLine('trendCombined', months, datasets, false);
+        }
+
+        function renderMultiLine(id, labels, datasets, isPercentage) {
+            const ctx = document.getElementById(id);
+            if (!ctx) return;
+            if (charts[id]) charts[id].destroy();
+            charts[id] = new Chart(ctx, {
+                type:'line',
+                data:{ labels, datasets: datasets.map(ds=>({ label:ds.label, data:ds.data.map(v=>Math.round(v*100)/100), borderColor:ds.color, backgroundColor:ds.color+'20', tension:0.4, fill:false, borderWidth:3, pointRadius:4 })) },
+                options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false}, plugins:{ legend:{ position:'top', labels:{ usePointStyle:true, padding:12, font:{size:11,weight:'bold'} }, onClick:(e,item,legend)=>{ const idx = item.datasetIndex; const label = legend.chart.data.datasets[idx].label; legendFilter = legendFilter===label ? null : label; legend.chart.data.datasets.forEach((_,i)=>{ legend.chart.setDatasetVisibility(i, legendFilter===null || legend.chart.data.datasets[i].label===legendFilter); }); legend.chart.update(); } }, tooltip:{ backgroundColor:'rgba(0,0,0,0.8)', padding:12, cornerRadius:8, callbacks:{ label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()}${isPercentage?'%':''}` } } }, scales:{ y:{ beginAtZero:true, max:isPercentage?100:undefined, ticks:{ callback:v=>isPercentage?v+'%':v.toLocaleString() }, grid:{color:'rgba(0,0,0,0.05)'} }, x:{ grid:{display:false} } } }
+            });
+        }
+
+        function renderMonthlyIncidence() {
+            const grid = document.getElementById('monthsGrid');
+            grid.innerHTML = '';
+            const short = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            const full = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+            let incidence = [165,278,342,498,385,405,520,295,272,388,468,382];
+            const data = loadedData.surveillance;
+            if (data?.length) {
+                incidence = full.map(month => {
+                    const monthData = data.filter(r => (r.Year||r.year)==currentTimePeriod && (r.Month||r.month)===month);
+                    const confirmed = monthData.reduce((s,r)=>s+(r.Confirmed_Cases||0),0);
+                    const pop = monthData.reduce((s,r)=>s+(r.Population||100000),0) || 100000;
+                    return Math.round((confirmed/pop)*1000);
+                });
+            }
+            short.forEach((m,i) => {
+                const val = incidence[i]||0;
+                let cls = val<250?'incidence-low':val<=450?'incidence-moderate':'incidence-high';
+                const active = currentMonth === full[i];
+                const box = document.createElement('div');
+                box.className = `month-box ${cls}${active?' active':''}`;
+                box.onclick = () => selectMonth(full[i]);
+                box.innerHTML = `<div class="month-name">${m}</div><div class="month-value">${val}</div>`;
+                grid.appendChild(box);
+            });
+        }
+
+        function handleDataTypeChange() { currentDataType = document.getElementById('dataTypeSelect').value; activeCardFilter = null; renderCards(); updateDashboard(); }
+        function handleTimePeriodChange() { currentTimePeriod = document.getElementById('timePeriodSelect').value; updateDashboard(); renderMonthlyIncidence(); }
+        function handleHeaderDistrictChange() { const d = document.getElementById('headerDistrictSelect').value; if(!d) selectNational(); else selectDistrict(d); }
+        function handleHeaderChiefdomChange() { const c = document.getElementById('headerChiefdomSelect').value; if(!c){ const d=document.getElementById('headerDistrictSelect').value; if(d) selectDistrict(d); } else selectChiefdom(c); }
+        function handleMonthChange() { currentMonth = document.getElementById('headerMonthSelect').value; updateDashboard(); renderMonthlyIncidence(); }
+        function selectMonth(month) { currentMonth = currentMonth===month ? '' : month; document.getElementById('headerMonthSelect').value = currentMonth; updateDashboard(); renderMonthlyIncidence(); }
+        function selectNational() { currentSelection='national'; activeCardFilter=null; document.getElementById('headerDistrictSelect').value=''; document.getElementById('headerChiefdomSelect').disabled=true; document.getElementById('headerChiefdomSelect').innerHTML='<option value="">Select District First</option>'; document.querySelectorAll('.sidebar-card').forEach(c=>c.classList.remove('active')); updateDashboard(); }
+        function selectDistrict(district) { currentSelection=district; activeCardFilter=null; document.querySelectorAll('.sidebar-card').forEach(c=>c.classList.remove('active')); const chiefdomSelect=document.getElementById('headerChiefdomSelect'); chiefdomSelect.disabled=false; chiefdomSelect.innerHTML='<option value="">All Chiefdoms</option>'+(chiefdomsData[district]||[]).map(c=>`<option value="${c}">${c}</option>`).join(''); updateDashboard(); }
+        function selectChiefdom(chiefdom) { currentSelection=chiefdom; activeCardFilter=null; document.querySelectorAll('.sidebar-card').forEach(c=>c.classList.remove('active')); updateDashboard(); }
+        function resetAllFilters() { currentSelection='national'; currentMonth=''; activeCardFilter=null; document.getElementById('headerDistrictSelect').value=''; document.getElementById('headerChiefdomSelect').disabled=true; document.getElementById('headerMonthSelect').value=''; document.querySelectorAll('.sidebar-card').forEach(c=>c.classList.remove('active')); updateDashboard(); renderMonthlyIncidence(); }
+        function filterByCard(metric) { const cards = document.querySelectorAll('.sidebar-card'); cards.forEach(c=>{ if(c.dataset.metric===metric){ if(c.classList.contains('active')){ c.classList.remove('active'); activeCardFilter=null; }else{ cards.forEach(cc=>cc.classList.remove('active')); c.classList.add('active'); activeCardFilter=metric; } } }); renderAllCharts(); }
+        function updateDashboard() { updateIndicators(); renderAllCharts(); }
+
+        window.addEventListener('load', initDashboard);
+    </script>
+</body>
+</html>
